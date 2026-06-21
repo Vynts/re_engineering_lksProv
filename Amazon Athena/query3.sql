@@ -1,0 +1,1 @@
+SELECT * FROM lks_analytics.transactions;
