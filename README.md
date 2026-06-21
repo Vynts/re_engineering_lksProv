@@ -1,1 +1,1 @@
-<img src="Flow Architechture.jpg" alt="A descriptive text of the image" witdh="100%">
+<img src="Flow%20Architecture.jpeg" alt="A descriptive text of the image" witdh="100%">
