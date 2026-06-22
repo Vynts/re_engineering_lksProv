@@ -37,14 +37,14 @@ jobs:
           cd /home/ubuntu/app-lks
           
           echo "=== BERHENTIKAN KONTAINER LAMA (JIKA ADA) ==="
-          docker stop lks-container || true
-          docker rm lks-container || true
+          sudo docker stop lks-container || true
+          sudo docker rm lks-container || true
           
           echo "=== MEMULAI BUILD IMAGE BARU DI EC2 ==="
-          docker build -t lks-app-ec2:latest .
+          sudo docker build -t lks-app-ec2:latest .
           
           echo "=== JALANKAN KONTAINER BARU ==="
-          docker run -d --name lks-container -p 8080:8080 lks-app-ec2:latest
+          sudo docker run -d --name lks-container -p 8080:8080 lks-app-ec2:latest
           
           echo "=== DEPLOY SELESAI DAN BERHASIL ==="
-          docker ps
+          sudo docker ps
