@@ -1,26 +1,8 @@
-name: Deploy to EC2
-
-on:
-  push:
-    branches: [ main ]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-
-    - name: Deploy via SSH to EC2
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ubuntu
-        key: ${{ secrets.EC2_SSH_KEY }}
-        script: |
-          cd /home/ubuntu/my-dashboard-app
-          git pull origin main
-          docker build -t flask-dashboard .
-          docker stop flask-dashboard-container || true
-          docker rm flask-dashboard-container || true
-          docker run -d -p 8080:8080 --name flask-dashboard-container flask-dashboard
+version: "3.8"
+services:
+  web:
+    build: .
+    container_name: lks-container
+    ports:
+      - "8080:8080"
+    restart: always
