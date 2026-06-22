@@ -10,28 +10,41 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    # 1. Tarik kode terbaru dari repositori GitHub ke runner
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Executing remote SSH commands to deploy
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.EC2_HOST }} 
-          username: ${{ secrets.EC2_USERNAME }} 
-          key: ${{ secrets.EC2_SSH_KEY }} 
-          port: 22
-          script: |
-            cd /home/ubuntu/app-lks || mkdir -p /home/ubuntu/app-lks && cd /home/ubuntu/app-lks
+    # 2. UPLOAD/COPY semua file dari GitHub ke server EC2 via SCP
+    - name: Copy files to EC2 via SCP
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        port: 22
+        source: "." # Mengcopy semua file di root project
+        target: "/home/ubuntu/app-lks"
 
-            echo "=== BERHENTIKAN KONTAINER LAMA (JIKA ADA) ==="
-            sudo docker stop lks-container || true
-            sudo docker rm lks-container || true
-
-            echo "=== MEMULAI BUILD IMAGE BARU DI EC2 ==="
-            sudo docker build -t lks-app-ec2:latest .
-
-            echo "=== JALANKAN KONTAINER BARU ==="
-            docker run -d --name lks-container -p 8080:8080 lks-app-ec2:latest
-
-            echo "=== DEPLOY SELESAI DAN BERHASIL ==="
-            sudo docker ps
+    # 3. Masuk ke EC2 via SSH untuk build dan running Docker
+    - name: Executing remote SSH commands to deploy
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        port: 22
+        script: |
+          cd /home/ubuntu/app-lks
+          
+          echo "=== BERHENTIKAN KONTAINER LAMA (JIKA ADA) ==="
+          docker stop lks-container || true
+          docker rm lks-container || true
+          
+          echo "=== MEMULAI BUILD IMAGE BARU DI EC2 ==="
+          docker build -t lks-app-ec2:latest .
+          
+          echo "=== JALANKAN KONTAINER BARU ==="
+          docker run -d --name lks-container -p 8080:8080 lks-app-ec2:latest
+          
+          echo "=== DEPLOY SELESAI DAN BERHASIL ==="
+          docker ps
