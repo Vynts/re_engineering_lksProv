@@ -1,33 +1,23 @@
 provider "aws" {
-  region = "us-west-2" # Ubah sesuai region yang kamu inginkan
+  region = "us-west-2"
 }
-
-# ==========================================
-# 1. KONFIGURASI S3 BUCKET
-# ==========================================
 
 resource "aws_s3_bucket" "transaction_bucket" {
-  bucket        = "my-unique-transaction-bucket-name" # Pastikan nama bucket ini unik secara global
-  force_destroy = true                                 # Mengizinkan bucket dihapus beserta serves didalamnya saat terraform destroy
+  bucket        = "my-unique-transaction-bucket-name" 
+  force_destroy = true                                 
 }
 
-# Membuat Folder "raw-transaction" di S3
 resource "aws_s3_object" "folder_raw" {
   bucket       = aws_s3_bucket.transaction_bucket.id
   key          = "raw-transaction/"
   content_type = "application/x-directory"
 }
 
-# Membuat Folder "hasil-athena" di S3
 resource "aws_s3_object" "folder_athena" {
   bucket       = aws_s3_bucket.transaction_bucket.id
   key          = "hasil-athena/"
   content_type = "application/x-directory"
 }
-
-# ==========================================
-# 2. KONFIGURASI DYNAMODB TABLE
-# ==========================================
 
 resource "aws_dynamodb_table" "transaction_table" {
   name         = "transactions"
