@@ -1,5 +1,5 @@
 provider "aws" {
-  region = "us-west-1" # Ubah sesuai region yang kamu inginkan
+  region = "us-west-2" # Ubah sesuai region yang kamu inginkan
 }
 
 # ==========================================
