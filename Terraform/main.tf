@@ -21,12 +21,12 @@ resource "aws_s3_object" "folder_athena" {
 
 resource "aws_dynamodb_table" "transaction_table" {
   name         = "transactions"
-  billing_mode = "PAY_PER_REQUEST" # Menggunakan mode On-Demand agar hemat biaya seperlunya
+  billing_mode = "PAY_PER_REQUEST" 
   hash_key     = "transaction_id"
 
   attribute {
     name = "transaction_id"
-    type = "S" # S = String, gunakan "N" jika id berupa Number
+    type = "S" 
   }
 
   tags = {
