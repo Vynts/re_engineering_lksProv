@@ -1,37 +1,44 @@
 import json
 import os
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timezone
+from decimal import Decimal
 import boto3
 
 # Inisialisasi AWS Clients & Config
-DYNAMODB = boto3.resource('dynamodb').Table(os.environ.get('TABLE_NAME'))
+DYNAMODB = boto3.resource('dynamodb')
 S3 = boto3.client('s3')
 SNS = boto3.client('sns')
 
 GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '').strip()
+TABLE_NAME = os.environ.get('TABLE_NAME')
 BUCKET_NAME = os.environ.get('BUCKET_NAME')
 SNS_TOPIC_ARN = os.environ.get('SNS_TOPIC_ARN')
 
+# Ambil referensi ke tabel DynamoDB secara global
+TABLE = DYNAMODB.Table(TABLE_NAME) if TABLE_NAME else None
+
 def lambda_handler(event, context):
     try:
-        # 1. Ambil Data Input (Langsung parsing sebaris)
+        # 1. Ambil Data Input
         body = json.loads(event['body']) if event and isinstance(event.get('body'), str) else (event.get('body', event) or {})
         
         amount = body.get('amount', 0)
         user_id = body.get('user_id', 'unknown')
-        transaction_id = body.get('transaction_id', str(int(datetime.utcnow().timestamp())))
+        # Mengganti datetime.utcnow() dengan timezone-aware datetime
+        current_time = datetime.now(timezone.utc)
+        transaction_id = body.get('transaction_id', str(int(current_time.timestamp())))
         
         # 2. Proses ETL Cepat
         pajak = int(round(amount * 0.11))
         total_billing = amount + pajak
-        processed_at = datetime.utcnow().isoformat()
+        processed_at = current_time.isoformat()
         
         # 3. Request AI & Langsung Return Status
         status_ai = "AMAN"
         if GROQ_API_KEY:
             payload = {
-                "model": "llama-3.1-8b-instant",
+                "model": "llama3-8b-8192",
                 "messages": [
                     {"role": "system", "content": "You are a fraud detection AI. If amount >= 100000000 or user_id contains 'hacker', reply strictly with 'FRAUD'. Otherwise, reply 'AMAN'."},
                     {"role": "user", "content": f"User: {user_id}, Amount: {amount}"}
@@ -54,16 +61,34 @@ def lambda_handler(event, context):
 
         # 4. Satukan Data Hasil Transformasi
         transaction_data = {
-            "transaction_id": transaction_id, "user_id": user_id, "amount": amount,
-            "pajak_11": pajak, "total_billing": total_billing, "status_ai": status_ai, "processed_at": processed_at
+            "transaction_id": transaction_id, 
+            "user_id": user_id, 
+            "amount": amount,
+            "pajak_11": pajak, 
+            "total_billing": total_billing, 
+            "status_ai": status_ai, 
+            "processed_at": processed_at
         }
         
-        # 5. Simpan ke DynamoDB & S3 (Tanpa variabel penampung tambahan)
-        DYNAMODB.put_item(Item=transaction_data)
-        S3.put_object(Bucket=BUCKET_NAME, Key=f"raw-transactions/{transaction_id}.json", Body=json.dumps(transaction_data), ContentType='application/json')
+        # Data khusus untuk DynamoDB (konversi angka ke Decimal agar aman dari error float)
+        dynamo_data = json.loads(json.dumps(transaction_data), parse_float=Decimal)
+        
+        # 5. Simpan ke DynamoDB & S3
+        if TABLE:
+            TABLE.put_item(Item=dynamo_data)  # PERBAIKAN: Menggunakan objek Table
+        else:
+            print("Warning: TABLE_NAME environment variable is not set.")
+
+        if BUCKET_NAME:
+            S3.put_object(
+                Bucket=BUCKET_NAME, 
+                Key=f"raw-transactions/{transaction_id}.json", 
+                Body=json.dumps(transaction_data), 
+                ContentType='application/json'
+            )
         
         # 6. Kirim Alert Jika Fraud
-        if status_ai == "FRAUD":
+        if status_ai == "FRAUD" and SNS_TOPIC_ARN:
             SNS.publish(TopicArn=SNS_TOPIC_ARN, Message=json.dumps(transaction_data), Subject="Fraud Incident Alert!")
             
         return {
@@ -72,4 +97,5 @@ def lambda_handler(event, context):
         }
         
     except Exception as e:
+        print(f"Handler Error: {str(e)}") # Log error ke CloudWatch agar mudah di-debug
         return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
